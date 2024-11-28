@@ -1,29 +1,32 @@
+const { query } = require("express")
 const prisma = require("../config/prisma")
 
-exports.create = async(req,res)=>{
-    try{
-        const { title, description,price,quantity,categoryId,images } = req.body
+exports.create = async (req, res) => {
+    try {
+        // code
+        const { title, description, price, quantity, categoryId, images } = req.body
+        // console.log(title, description, price, quantity, images)
         const product = await prisma.product.create({
-            data:{
+            data: {
                 title: title,
                 description: description,
                 price: parseFloat(price),
                 quantity: parseInt(quantity),
-                categoryId : parseInt(categoryId),
-                images:{
-                    create: images.map((item)=> ({
-                       asset_id: item.asset_id,
-                       public_id: item.public_id,
-                       url: item.url_id,
-                       secure_url: item.secure_url
+                categoryId: parseInt(categoryId),
+                images: {
+                    create: images.map((item) => ({
+                        asset_id: item.asset_id,
+                        public_id: item.public_id,
+                        url: item.url,
+                        secure_url: item.secure_url
                     }))
                 }
             }
         })
         res.send(product)
-    }catch(err){
+    } catch (err) {
         console.log(err)
-        res.status(500).json({ message : "Server Error"})
+        res.status(500).json({ message: "Server error" })
     }
 }
 
@@ -73,17 +76,94 @@ exports.remove = async(req,res)=>{
 exports.listby = async(req,res)=>{
     try{
 
-        res.send("Hello listby Product")
+        const {sort,order,limit} = req.body
+        const products = await prisma.product.findMany({
+            take: limit,
+            orderBy:{ [sort]:order},
+            include: {category: true}
+        })
+        res.send(products)
     }catch(err){
         console.log(err)
         res.status(500).json({ message : "Server Error"})
     }
 }
 
-exports.searchfilter = async(req,res)=>{
+const handleQuery = async(req,res,query)=>{
     try{
+        const products = await prisma.product.findMany({
+            where:{
+                title:{
+                    contains:query,
+                }
+            },
+            include:{
+                category:true,
+                images:true,
+            }
+        })
+        res.send(products) 
+    }catch(err){
+        console.log(err)
+        req.status(500).json({ message: "Search Error"})
+    }
+}
+const handlePrice = async(req,res,priceRange)=>{
+    try {
+        const products = await prisma.product.findMany({
+            where:{
+                price:{
+                    gte: priceRange[0],
+                    lte: priceRange[1]
+                }
+            },
+            include:{
+                category:true,
+                images:true
+            }
+        })
+        res.send(products)
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({ message: "Server error"})
+    }
+}
+const handleCategory = async(req,res,categoryId)=>{
+    try {
+        const products = await prisma.product.findMany({
+            where:{
+                categoryId:{
+                    in: categoryId.map((id)=> Number(id))
+                }
+            },
+            include:{
+                category:true,
+                images:true
+            }
+        })
+        res.send(products)
+    } catch (err) {
+        console.log(err)
+        res.status(500).json({ message: "Server error"})
+    }
+}
+exports.searchFilter = async(req,res)=>{
+    try{
+        const { query, category, price} = req.body
+        if(query){
+            console.log('query-->',query)
+            await handleQuery(req,res,query)
+        }
+        if(category){
+            console.log('category-->',category)
+            await handleCategory(req,res,category)
+        }
+        if(price){
+            console.log('price-->',price)
+            await handlePrice(req,res,price)
+        }
 
-        res.send("Hello searchfilter Product")
+        // res.send("Hello searchfilter Product")
     }catch(err){
         console.log(err)
         res.status(500).json({ message : "Server Error"})
